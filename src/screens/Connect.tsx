@@ -83,7 +83,7 @@ export function Connect({ onWallet, onNew, onCancel, onBiometric }: ConnectProps
           style={{ width: '100%', marginBottom: 28 }}
           onClick={onBiometric}
         >
-          Face ID / Touch ID
+          {t('biometricCta')}
         </Button>
       )}
 
