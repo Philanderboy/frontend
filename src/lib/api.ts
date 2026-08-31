@@ -21,7 +21,7 @@ export async function getProjects(): Promise<Project[]> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return (await res.json()) as Project[]
   } catch {
-    console.warn('[api] GET /projects failed — using mock data')
+    console.warn('[api] GET /projects failed - using mock data')
     return HB_DATA.projects
   }
 }
@@ -40,7 +40,7 @@ export async function getProject(id: number): Promise<ProjectWithDetail | null> 
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return (await res.json()) as ProjectWithDetail
   } catch {
-    console.warn(`[api] GET /projects/${id} failed — using mock data`)
+    console.warn(`[api] GET /projects/${id} failed - using mock data`)
     if (!mockProject || !mockDetail) return null
     return { project: mockProject, detail: mockDetail }
   }
@@ -53,7 +53,7 @@ export async function getProject(id: number): Promise<ProjectWithDetail | null> 
  * with a backend challenge, but for now we generate a random challenge locally.
  */
 export async function biometricLogin(): Promise<boolean> {
-  if (typeof window === 'undefined' || !window.PublicKeyCredential) {
+  if (typeof window === 'undefined' || !window.PublicKeyCredential || !navigator.credentials) {
     console.warn('[api] Biometric login not supported on this device/browser')
     return false
   }
@@ -62,7 +62,7 @@ export async function biometricLogin(): Promise<boolean> {
     // Generate a random challenge (in production, this would come from the server)
     const challenge = new Uint8Array(32)
     crypto.getRandomValues(challenge)
-
+  
     // Request a credential from the authenticator
     const credential = await navigator.credentials.get({
       publicKey: {
@@ -72,7 +72,7 @@ export async function biometricLogin(): Promise<boolean> {
         userVerification: 'required',
       },
     })
-
+  
     return Boolean(credential)
   } catch (error) {
     console.warn('[api] biometric login failed:', error)
