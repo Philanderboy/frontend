@@ -3,15 +3,17 @@ import uuid
 from io import BytesIO
 
 from flask import Flask, render_template, request, redirect, url_for, abort, session, jsonify, render_template_string
-from flask_sqlalchemit import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from PIL import Image
 from werkzeug.utils import secure_filename
+
+import webauthn
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'
 
-app.config['SQL!ALCHEMY_DATABASE_URI] = 'sqlite:///tasks.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 UPLOAD_FOLDER = os.path.join(app.static_folder, 'uploads')
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff'}
@@ -118,8 +120,11 @@ def login():
             session['user'] = username
             return redirect(url_for('index'))
         else:
-            return render_template_string('<p style="color:red">Invalid credentials. Try again.</p><a href="{{ url_for('login') }}">Back to login</a>')
-    login_html = ''
+            return render_template_string(
+                "<p style='color:red'>Invalid credentials. Try again.</p>"
+                "<a href=\"{{ url_for('login') }}\">Back to login</a>"
+            )
+    login_html = """
     <!doctype html>
     <html>
     <head><title>Login</title></head>
@@ -147,7 +152,7 @@ def login():
         </script>
     </body>
     </html>
-    ''
+    """
     return render_template_string(login_html)
 
 @app.route('/logout')
@@ -158,6 +163,59 @@ def logout():
 @app.route('/api/biometric-status')
 def biometric_status():
     return jsonify({'biometric_supported': True})
+
+# WebAuthn endpoints
+@app.route('/webauthn/register/begin', methods=['POST'])
+def webauthn_register_begin():
+    data = request.get_json()
+    username = data.get('username') if data else None
+    if not username:
+        return jsonify({'error': 'Username required'}), 400
+    try:
+        options = webauthn.begin_registration(username)
+        return jsonify(options)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/webauthn/register/complete', methods=['POST'])
+def webauthn_register_complete():
+    data = request.get_json()
+    username = data.get('username') if data else None
+    credential = data.get('credential') if data else None
+    if not username or not credential:
+        return jsonify({'error': 'Missing data'}), 400
+    try:
+        result = webauthn.complete_registration(username, credential)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/webauthn/login/begin', methods=['POST'])
+def webauthn_login_begin():
+    data = request.get_json()
+    username = data.get('username') if data else None
+    if not username:
+        return jsonify({'error': 'Username required'}), 400
+    try:
+        options = webauthn.begin_authentication(username)
+        return jsonify(options)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/webauthn/login/complete', methods=['POST'])
+def webauthn_login_complete():
+    data = request.get_json()
+    username = data.get('username') if data else None
+    credential = data.get('credential') if data else None
+    if not username or not credential:
+        return jsonify({'error': 'Missing data'}), 400
+    try:
+        result = webauthn.complete_authentication(username, credential)
+        if result.get('verified'):
+            session['user'] = username
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     with app.app_context():
